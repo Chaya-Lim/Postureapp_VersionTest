@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_config.dart';
-import 'connect_page.dart'; // 👈 เพิ่มไฟล์นี้
+import 'home_page.dart';
+import 'connect_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,17 +12,24 @@ void main() async {
     options: FirebaseConfig.webOptions,
   );
 
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  final savedDevice = prefs.getString("deviceName");
+
+  runApp(MyApp(savedDevice: savedDevice));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String? savedDevice;
+
+  const MyApp({super.key, this.savedDevice});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: ConnectPage(), // 👈 เปลี่ยนจาก HomePage()
+      home: savedDevice != null
+          ? HomePage(deviceName: savedDevice!)
+          : const ConnectPage(),
     );
   }
 }

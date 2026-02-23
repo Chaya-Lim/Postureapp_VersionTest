@@ -22,14 +22,13 @@ class _DashboardPageState extends State<DashboardPage> {
   double currentPitch = 0;
   double currentRoll = 0;
   String currentPosture = "unknown";
+  String currentPostureDetail = "";
 
   @override
   void initState() {
     super.initState();
-
     ref = FirebaseDatabase.instance
         .ref("${widget.deviceName}/history");
-
     listenHistory();
   }
 
@@ -37,9 +36,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ref.onValue.listen((event) {
       final data = event.snapshot.value;
 
-      if (data == null || data is! Map) {
-        return;
-      }
+      if (data == null || data is! Map) return;
 
       final Map<dynamic, dynamic> historyData = data;
       List<Map<String, dynamic>> tempList = [];
@@ -54,6 +51,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 "pitch": (value["pitch"] ?? 0).toDouble(),
                 "roll": (value["roll"] ?? 0).toDouble(),
                 "posture": value["posture"] ?? "unknown",
+                "postureDetail":
+                    value["postureDetail"]?.toString() ?? "",
               });
             }
           });
@@ -72,6 +71,8 @@ class _DashboardPageState extends State<DashboardPage> {
           currentPitch = historyList.first["pitch"];
           currentRoll = historyList.first["roll"];
           currentPosture = historyList.first["posture"];
+          currentPostureDetail =
+              historyList.first["postureDetail"];
         }
       });
     });
@@ -83,8 +84,38 @@ class _DashboardPageState extends State<DashboardPage> {
         return const Color(0xFF6E9F8D);
       case "incorrect":
         return Colors.redAccent;
+      case "unknown":
+        return Colors.orange;
       default:
         return Colors.grey;
+    }
+  }
+
+  String postureText(String posture) {
+    switch (posture) {
+      case "correct":
+        return "Sitting Correct";
+      case "incorrect":
+        return "Sitting Incorrect";
+      case "unknown":
+        return "Not Calibrated";
+      default:
+        return "Unknown";
+    }
+  }
+
+  String postureDetailText(String posture, String detail) {
+    switch (posture) {
+      case "correct":
+        return "ท่านั่งปกติ";
+      case "incorrect":
+        return detail.isNotEmpty
+            ? detail
+            : "ท่านั่งไม่ถูกต้อง";
+      case "unknown":
+        return "กรุณาปรับเทียบอุปกรณ์ก่อนใช้งาน";
+      default:
+        return "";
     }
   }
 
@@ -188,7 +219,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
               const SizedBox(height: 20),
 
-              // ===== POSTURE STATUS =====
+              // ===== CURRENT POSTURE =====
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -213,14 +244,22 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      currentPosture == "correct"
-                          ? "Sitting Correct"
-                          : "Sitting Incorrect",
+                      postureText(currentPosture),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color:
                             postureColor(currentPosture),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      postureDetailText(
+                          currentPosture,
+                          currentPostureDetail),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black54,
                       ),
                     ),
                   ],
@@ -252,17 +291,21 @@ class _DashboardPageState extends State<DashboardPage> {
                               historyList[index];
 
                           return Container(
-                            margin: const EdgeInsets.symmetric(
-                                vertical: 6),
-                            padding: const EdgeInsets.all(15),
+                            margin:
+                                const EdgeInsets.symmetric(
+                                    vertical: 6),
+                            padding:
+                                const EdgeInsets.all(15),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius:
-                                  BorderRadius.circular(15),
+                                  BorderRadius.circular(
+                                      15),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black
-                                      .withValues(alpha: 0.05),
+                                      .withValues(
+                                          alpha: 0.05),
                                   blurRadius: 8,
                                   offset:
                                       const Offset(0, 4),
@@ -276,23 +319,41 @@ class _DashboardPageState extends State<DashboardPage> {
                               children: [
                                 Column(
                                   crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                      CrossAxisAlignment
+                                          .start,
                                   children: [
                                     Text(
                                       "${item["date"]}  ${item["time"]}",
                                       style:
                                           const TextStyle(
                                         fontWeight:
-                                            FontWeight.bold,
+                                            FontWeight
+                                                .bold,
                                       ),
                                     ),
                                     Text(
                                       "Pitch: ${item["pitch"]}° | Roll: ${item["roll"]}°",
                                     ),
+                                    if ((item["postureDetail"] ??
+                                            "")
+                                        .toString()
+                                        .isNotEmpty)
+                                      Text(
+                                        item["postureDetail"]
+                                            .toString(),
+                                        style:
+                                            const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors
+                                              .black54,
+                                        ),
+                                      ),
                                   ],
                                 ),
                                 Text(
-                                  item["posture"],
+                                  item["posture"]
+                                      .toString()
+                                      .toUpperCase(),
                                   style: TextStyle(
                                     color: postureColor(
                                         item["posture"]),

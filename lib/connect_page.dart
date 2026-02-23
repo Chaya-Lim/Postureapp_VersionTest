@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_page.dart';
 
 class ConnectPage extends StatefulWidget {
@@ -14,13 +15,11 @@ class _ConnectPageState extends State<ConnectPage> {
   bool isLoading = false;
 
   Future<void> connectToBoard() async {
-    String deviceName = controller.text.trim();
+    final deviceName = controller.text.trim();
 
     if (deviceName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please enter board name"),
-        ),
+        const SnackBar(content: Text("Please enter board name")),
       );
       return;
     }
@@ -28,37 +27,43 @@ class _ConnectPageState extends State<ConnectPage> {
     setState(() => isLoading = true);
 
     try {
-      final snapshot = await FirebaseDatabase.instance
-          .ref(deviceName)
-          .get();
+      final snapshot =
+          await FirebaseDatabase.instance.ref(deviceName).get();
 
       if (!mounted) return;
 
       if (snapshot.exists) {
-        // ไปหน้า HomePage พร้อมส่ง deviceName
-        Navigator.pushReplacement(
-          context,
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString("deviceName", deviceName);
+
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) =>
-                HomePage(deviceName: deviceName),
+            builder: (_) => HomePage(deviceName: deviceName),
           ),
         );
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Board not found ❌"),
-          ),
+          const SnackBar(content: Text("Board not found ❌")),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Connection error"),
-        ),
+        const SnackBar(content: Text("Connection error")),
       );
     }
 
+    if (!mounted) return;
     setState(() => isLoading = false);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -121,26 +126,27 @@ class _ConnectPageState extends State<ConnectPage> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed:
-                        isLoading ? null : connectToBoard,
+                    onPressed: isLoading ? null : connectToBoard,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          const Color(0xFF6E9F8D),
+                      backgroundColor: const Color(0xFF6E9F8D),
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(15),
+                        borderRadius: BorderRadius.circular(15),
                       ),
                     ),
                     child: isLoading
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text(
                             "Connect",
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight:
-                                  FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                   ),

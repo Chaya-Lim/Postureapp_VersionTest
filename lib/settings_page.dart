@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'connect_page.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final String deviceName;
 
   const SettingsPage({super.key, required this.deviceName});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  Future<void> disconnect() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('deviceName');
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const ConnectPage()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +34,6 @@ class SettingsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             const SizedBox(height: 40),
 
             const Text(
@@ -39,7 +57,7 @@ class SettingsPage extends StatelessWidget {
                   const Icon(Icons.memory, color: Color(0xFF6E9F8D)),
                   const SizedBox(width: 10),
                   Text(
-                    "Connected Board: $deviceName",
+                    "Connected Board: ${widget.deviceName}",
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ],
@@ -52,14 +70,7 @@ class SettingsPage extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const ConnectPage()),
-                    (route) => false,
-                  );
-                },
+                onPressed: disconnect,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   shape: RoundedRectangleBorder(

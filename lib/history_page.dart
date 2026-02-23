@@ -3,7 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class HistoryPage extends StatefulWidget {
-  final String deviceName; // 👈 เพิ่มตัวนี้
+  final String deviceName;
 
   const HistoryPage({super.key, required this.deviceName});
 
@@ -12,7 +12,7 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  late DatabaseReference ref; // 👈 เปลี่ยนจาก final เป็น late
+  late DatabaseReference ref;
 
   Map<String, Map<String, dynamic>> dailyData = {};
   List<String> sortedDates = [];
@@ -21,11 +21,7 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
-
-    // 👇 ใช้ deviceName ที่ส่งเข้ามา
-    ref = FirebaseDatabase.instance
-        .ref("${widget.deviceName}/history");
-
+    ref = FirebaseDatabase.instance.ref("${widget.deviceName}/history");
     loadHistory();
   }
 
@@ -40,24 +36,46 @@ class _HistoryPageState extends State<HistoryPage> {
       historyData.forEach((date, dateValue) {
         int correct = 0;
         int incorrect = 0;
+        int unknown = 0;
 
+        Map<String, int> detailCount = {};
         Map times = dateValue as Map;
 
         times.forEach((time, value) {
-          if (value["posture"] == "correct") {
+          String posture = value["posture"] ?? "unknown";
+
+          if (posture == "correct") {
             correct++;
-          } else {
+          } else if (posture == "incorrect") {
             incorrect++;
+
+            if (value["postureDetail"] != null) {
+              String detail = value["postureDetail"];
+              List<String> parts = detail.split(",");
+
+              for (var p in parts) {
+                String trimmed = p.trim();
+                if (trimmed.isEmpty) continue;
+                detailCount[trimmed] =
+                    (detailCount[trimmed] ?? 0) + 1;
+              }
+            }
+          } else {
+            // unknown
+            unknown++;
           }
         });
 
-        int total = correct + incorrect;
-        double percent = total == 0 ? 0 : (correct / total) * 100;
+        int totalValid = correct + incorrect;
+        double percent =
+            totalValid == 0 ? 0 : (correct / totalValid) * 100;
 
         tempDaily[date] = {
           "correct": correct,
           "incorrect": incorrect,
+          "unknown": unknown,
           "percent": percent,
+          "detailCount": detailCount,
         };
       });
 
@@ -74,7 +92,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (sortedDates.isEmpty) {
+    if (sortedDates.isEmpty || selectedDate == null) {
       return const Scaffold(
         backgroundColor: Color(0xFFF4F7F6),
         body: Center(child: CircularProgressIndicator()),
@@ -85,7 +103,12 @@ class _HistoryPageState extends State<HistoryPage> {
 
     double correct = data["correct"].toDouble();
     double incorrect = data["incorrect"].toDouble();
+    double unknown = data["unknown"].toDouble();
     double percent = data["percent"];
+    Map<String, int> detailCount =
+        Map<String, int>.from(data["detailCount"]);
+
+    bool noValidData = (correct + incorrect) == 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F6),
@@ -94,7 +117,7 @@ class _HistoryPageState extends State<HistoryPage> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         title: Text(
-          "History (${widget.deviceName})", // 👈 แสดงชื่อบอร์ดได้ด้วย
+          "History (${widget.deviceName})",
           style: const TextStyle(color: Colors.black),
         ),
       ),
@@ -103,19 +126,12 @@ class _HistoryPageState extends State<HistoryPage> {
         child: Column(
           children: [
 
-            // ===== DATE SELECTOR CARD =====
+            // DATE SELECTOR
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  )
-                ],
               ),
               child: DropdownButton<String>(
                 value: selectedDate,
@@ -137,100 +153,126 @@ class _HistoryPageState extends State<HistoryPage> {
 
             const SizedBox(height: 25),
 
-            // ===== CHART CARD =====
+            // PIE CHART CARD
             Container(
               padding: const EdgeInsets.all(25),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  )
-                ],
               ),
               child: Column(
                 children: [
+
                   const Text(
                     "Posture Success Rate",
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16),
                   ),
+
                   const SizedBox(height: 20),
 
                   SizedBox(
                     height: 220,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        PieChart(
-                          PieChartData(
-                            sectionsSpace: 4,
-                            centerSpaceRadius: 60,
-                            sections: [
-                              PieChartSectionData(
-                                value: correct,
-                                color: const Color(0xFF6E9F8D),
-                                radius: 50,
-                                showTitle: false,
+                    child: noValidData
+                        ? const Center(
+                            child: Text(
+                              "ยังไม่มีข้อมูลการนั่ง\n(ยังไม่ได้ปรับเทียบ)",
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              PieChart(
+                                PieChartData(
+                                  sectionsSpace: 4,
+                                  centerSpaceRadius: 60,
+                                  sections: [
+                                    PieChartSectionData(
+                                      value: correct,
+                                      color: const Color(0xFF6E9F8D),
+                                      radius: 50,
+                                      showTitle: false,
+                                    ),
+                                    PieChartSectionData(
+                                      value: incorrect,
+                                      color: Colors.redAccent,
+                                      radius: 50,
+                                      showTitle: false,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              PieChartSectionData(
-                                value: incorrect,
-                                color: Colors.redAccent,
-                                radius: 50,
-                                showTitle: false,
-                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "${percent.toStringAsFixed(1)}%",
+                                    style: TextStyle(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.bold,
+                                      color: percent >= 70
+                                          ? const Color(0xFF6E9F8D)
+                                          : percent >= 40
+                                              ? Colors.orange
+                                              : Colors.red,
+                                    ),
+                                  ),
+                                  const Text("Correct"),
+                                ],
+                              )
                             ],
                           ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  if (!noValidData)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+
+                        Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF6E9F8D),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Correct: ${correct.toInt()}",
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600),
                         ),
 
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "${percent.toStringAsFixed(1)}%",
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: percent >= 70
-                                    ? const Color(0xFF6E9F8D)
-                                    : percent >= 40
-                                        ? Colors.orange
-                                        : Colors.red,
-                              ),
-                            ),
-                            const Text("Correct"),
-                          ],
-                        )
+                        const SizedBox(width: 25),
+
+                        Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Incorrect: ${incorrect.toInt()}",
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.center,
-                    children: [
-                      _buildLegend(
-                          const Color(0xFF6E9F8D),
-                          "Correct: ${correct.toInt()}"),
-                      const SizedBox(width: 20),
-                      _buildLegend(
-                          Colors.redAccent,
-                          "Incorrect: ${incorrect.toInt()}"),
-                    ],
-                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // ===== SUGGESTION CARD =====
+            // SUMMARY CARD
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -238,7 +280,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                _getSuggestion(percent),
+                _buildSummary(percent, correct.toInt(),
+                    incorrect.toInt(), unknown.toInt(), detailCount),
                 style: const TextStyle(
                     fontWeight: FontWeight.w500),
               ),
@@ -249,32 +292,54 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildLegend(Color color, String text) {
-    return Row(
-      children: [
-        Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(text),
-      ],
-    );
-  }
+  String _buildSummary(double percent, int correctTotal,
+      int incorrectTotal, int unknownTotal,
+      Map<String, int> detailCount) {
 
-  String _getSuggestion(double percent) {
-    if (percent >= 80) {
-      return "Excellent posture 👏 \nท่านั่งดีมาก หลังตรงสม่ำเสมอ รักษาพฤติกรรมนี้ไว้";
-    } else if (percent >= 60) {
-      return "Good but can improve \nโดยรวมดี แต่ยังมีบางช่วงที่นั่งผิด ควรระวังการเอนตัว";
-    } else if (percent >= 40) {
-      return "Needs improvement \nมีการนั่งผิดค่อนข้างบ่อย ควรปรับท่านั่งให้ตรงมากขึ้น";
-    } else {
-      return "Posture needs serious attention \nท่านั่งส่วนใหญ่ผิด เสี่ยงปวดหลัง ควรปรับทันที";
+    if (correctTotal + incorrectTotal == 0) {
+      return "วันนี้ยังไม่มีข้อมูลการนั่งที่ประเมินได้\n"
+          "กรุณาปรับเทียบอุปกรณ์ก่อนใช้งานค่ะ";
     }
+
+    if (incorrectTotal == 0) {
+      return "ยอดเยี่ยมมาก 👏\n"
+          "วันนี้คุณนั่งถูกต้องตลอดทั้งวัน "
+          "(${percent.toStringAsFixed(1)}%) รักษาแบบนี้ไว้นะคะ 💚";
+    }
+
+    String levelText;
+
+    if (percent >= 80) {
+      levelText = "โดยรวมทำได้ดีมาก 💚";
+    } else if (percent >= 60) {
+      levelText = "วันนี้ทำได้ดีพอสมควร 🙂";
+    } else if (percent >= 40) {
+      levelText = "วันนี้มีช่วงที่นั่งผิดค่อนข้างบ่อยนะคะ";
+    } else {
+      levelText = "วันนี้นั่งผิดบ่อยมากเลยนะคะ 💛";
+    }
+
+    if (detailCount.isEmpty) {
+      return "$levelText\n"
+          "วันนี้นั่งผิดทั้งหมด $incorrectTotal ครั้ง\n"
+          "ลองระวังท่านั่งให้มากขึ้นอีกนิดนะคะ";
+    }
+
+    var sorted = detailCount.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    int topCount = sorted.first.value;
+
+    List<String> topProblems = sorted
+        .where((e) => e.value == topCount)
+        .map((e) => e.key)
+        .toList();
+
+    String joined = topProblems.join(" + ");
+
+    return "$levelText\n"
+        "วันนี้นั่งผิดทั้งหมด $incorrectTotal ครั้ง\n"
+        "ปัญหาที่พบมากที่สุดคือ \"$joined\"\n"
+        "ลองใส่ใจจุดนี้เป็นพิเศษ จะช่วยให้ผลลัพธ์ดีขึ้นมากค่ะ 🌿";
   }
 }
