@@ -147,6 +147,7 @@ class _ConnectPageState extends State<ConnectPage> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                   ),
