@@ -4,6 +4,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_config.dart';
 import 'home_page.dart';
 import 'connect_page.dart';
+import 'services/notification_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// void main() async {
+//   WidgetsFlutterBinding.ensureInitialized();
+
+//   await Firebase.initializeApp(
+//     options: FirebaseConfig.webOptions,
+//   );
+
+//   final prefs = await SharedPreferences.getInstance();
+//   final savedDevice = prefs.getString("deviceName");
+
+//   runApp(MyApp(savedDevice: savedDevice));
+// }
+Future<void> firebaseMessagingBackgroundHandler(
+    RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +30,12 @@ void main() async {
   await Firebase.initializeApp(
     options: FirebaseConfig.webOptions,
   );
+
+  /// register background
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  /// init notification
+  await NotificationService.init();
 
   final prefs = await SharedPreferences.getInstance();
   final savedDevice = prefs.getString("deviceName");
