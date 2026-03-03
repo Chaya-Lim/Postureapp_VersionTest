@@ -2,16 +2,15 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
+
   static final FlutterLocalNotificationsPlugin
       flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   static Future init() async {
 
-    /// request permission
     await FirebaseMessaging.instance.requestPermission();
 
-    /// local notification setting
     const AndroidInitializationSettings android =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -20,7 +19,6 @@ class NotificationService {
 
     await flutterLocalNotificationsPlugin.initialize(settings);
 
-    /// foreground listener
     FirebaseMessaging.onMessage.listen((message) {
       showNotification(message);
     });
@@ -47,5 +45,25 @@ class NotificationService {
     );
   }
 
-  static void showIncorrectPostureLocal() {}
+  /// ✅ เพิ่มอันนี้
+  static Future showIncorrectPostureLocal() async {
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'posture_channel',
+      'Posture Alert',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails details =
+        NotificationDetails(android: androidDetails);
+
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      "Incorrect Posture",
+      "Incorrect posture detected 3 times consecutively.",
+      details,
+    );
+  }
 }
